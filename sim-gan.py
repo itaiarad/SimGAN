@@ -173,8 +173,7 @@ def adversarial_training(synthesis_eyes_dir, mpii_gaze_dir, refiner_model_path=N
     #
 
     datagen = image.ImageDataGenerator(
-        preprocessing_function=applications.xception.preprocess_input,
-        dim_ordering='tf')
+        preprocessing_function=applications.xception.preprocess_input)
 
     flow_from_directory_params = {'target_size': (img_height, img_width),
                                   'color_mode': 'grayscale' if img_channels == 1 else 'rgb',
