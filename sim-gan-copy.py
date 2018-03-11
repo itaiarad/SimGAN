@@ -28,7 +28,6 @@ from utils.image_history_buffer import ImageHistoryBuffer
 path = os.path.dirname(os.path.abspath(__file__))
 cache_dir = os.path.join(path, 'cache')
 
-
 #
 # image dimensions
 #
@@ -42,12 +41,11 @@ img_channels = 1
 #
 
 nb_steps = 10000
-batch_size = 10 #    Change back to 512
+batch_size = 512
 k_d = 1  # number of discriminator updates per step
 k_g = 2  # number of generative network updates per step
 log_interval = 100
 
-tf.logging.set_verbosity(tf.logging.INFO)
 
 def refiner_network(input_image_tensor):
     """
@@ -67,22 +65,23 @@ def refiner_network(input_image_tensor):
         :param input_features: Input tensor to ResNet block.
         :return: Output tensor from ResNet block.
         """
-        y = layers.Conv2D(nb_features, (nb_kernel_rows, nb_kernel_cols), padding='same')(input_features)
+        y = layers.Convolution2D(nb_features, nb_kernel_rows, nb_kernel_cols, border_mode='same')(input_features)
         y = layers.Activation('relu')(y)
-        y = layers.Conv2D(nb_features, (nb_kernel_rows, nb_kernel_cols), padding='same')(y)
+        y = layers.Convolution2D(nb_features, nb_kernel_rows, nb_kernel_cols, border_mode='same')(y)
 
         y = layers.merge([input_features, y], mode='sum')
         return layers.Activation('relu')(y)
 
     # an input image of size w × h is convolved with 3 × 3 filters that output 64 feature maps
-    x = layers.Conv2D(64, (3, 3), padding='same', activation='relu')(input_image_tensor)
+    x = layers.Convolution2D(64, 3, 3, border_mode='same', activation='relu')(input_image_tensor)
 
     # the output is passed through 4 ResNet blocks
     for _ in range(4):
         x = resnet_block(x)
+
     # the output of the last ResNet block is passed to a 1 × 1 convolutional layer producing 1 feature map
     # corresponding to the refined synthetic image
-    return layers.Conv2D(img_channels, (1, 1), padding='same', activation='tanh')(x)
+    return layers.Convolution2D(img_channels, 1, 1, border_mode='same', activation='tanh')(x)
 
 
 def discriminator_network(input_image_tensor):
@@ -92,12 +91,12 @@ def discriminator_network(input_image_tensor):
     :param input_image_tensor: Input tensor corresponding to an image, either real or refined.
     :return: Output tensor that corresponds to the probability of whether an image is real or refined.
     """
-    x = layers.Conv2D(96, (3, 3), padding='same', subsample=(2, 2), activation='relu')(input_image_tensor)
-    x = layers.Conv2D(64, (3, 3), padding='same', subsample=(2, 2), activation='relu')(x)
+    x = layers.Convolution2D(96, 3, 3, border_mode='same', subsample=(2, 2), activation='relu')(input_image_tensor)
+    x = layers.Convolution2D(64, 3, 3, border_mode='same', subsample=(2, 2), activation='relu')(x)
     x = layers.MaxPooling2D(pool_size=(3, 3), border_mode='same', strides=(1, 1))(x)
-    x = layers.Conv2D(32, (3, 3), padding='same', subsample=(1, 1), activation='relu')(x)
-    x = layers.Conv2D(32, (1, 1), padding='same', subsample=(1, 1), activation='relu')(x)
-    x = layers.Conv2D(2, (1, 1), padding='same', subsample=(1, 1), activation='relu')(x)
+    x = layers.Convolution2D(32, 3, 3, border_mode='same', subsample=(1, 1), activation='relu')(x)
+    x = layers.Convolution2D(32, 1, 1, border_mode='same', subsample=(1, 1), activation='relu')(x)
+    x = layers.Convolution2D(2, 1, 1, border_mode='same', subsample=(1, 1), activation='relu')(x)
 
     # here one feature map corresponds to `is_real` and the other to `is_refined`,
     # and the custom loss function is then `tf.nn.sparse_softmax_cross_entropy_with_logits`
@@ -293,8 +292,6 @@ def adversarial_training(synthesis_eyes_dir, mpii_gaze_dir, refiner_model_path=N
             disc_loss_refined = np.add(discriminator_model.train_on_batch(refined_image_batch, y_refined),
                                        disc_loss_refined)
 
-        # sess.run()
-
         if not i % log_interval:
             # plot batch of refined images w/ current refiner
             figure_name = 'refined_image_batch_step_{}.png'.format(i)
@@ -329,8 +326,5 @@ if __name__ == '__main__':
     # TODO: if pre-trained models are passed in, we don't take the steps they've been trained for into account
     refiner_model_path = sys.argv[3] if len(sys.argv) >= 4 else None
     discriminator_model_path = sys.argv[4] if len(sys.argv) >= 5 else None
-    synthesis_eyes_dir = r'C:\ITC\gan-video\Data\synthetic_images'
-    mpii_gaze_dir = r'C:\ITC\gan-video\Data\real_hand_images'
-    refiner_model_path = r'C:\ITC\gan-video\Resources\simGAN_implemintation\SimGAN\cache\refiner_model_pre_trained.h5'
-    discriminator_model_path = r'C:\ITC\gan-video\Resources\simGAN_implemintation\SimGAN\cache\discriminator_model_pre_trained.h5'
-    main(synthesis_eyes_dir, mpii_gaze_dir, refiner_model_path, discriminator_model_path)
+
+    main(sys.argv[1], sys.argv[2], refiner_model_path, discriminator_model_path)
